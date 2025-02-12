@@ -1,7 +1,7 @@
 import struct
 
 
-class SomeIP:
+class Packet:
     def __init__(
         self,
         service_id: int,
@@ -56,7 +56,7 @@ class SomeIP:
         return header + self.payload
 
     @classmethod
-    def decode(cls, data: bytes) -> "SomeIP":
+    def decode(cls, data: bytes) -> "Packet":
         header = data[:16]
         payload = data[16:]
         (
@@ -70,7 +70,7 @@ class SomeIP:
             message_type,
             return_code,
         ) = struct.unpack(">HHIHHBBBB", header)
-        return SomeIP(
+        return Packet(
             service_id=service_id,
             method_id=method_id,
             client_id=client_id,
