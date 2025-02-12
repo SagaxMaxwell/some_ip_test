@@ -23,10 +23,10 @@ class Connection:
     def send(self, packet: bytes, timeout: int = 5) -> bytes:
         if not self.__sock:
             raise ConnectionError()
-        self.sock.settimeout(timeout)
-        self.__sock.sendto(packet, (self.server_ip, self.server_port))
+        self.__sock.settimeout(timeout)
+        self.__sock.sendto(packet, (self.__ipv4, self.__port))
         try:
-            response, server_address = self.sock.recvfrom(1024)
+            response, server_address = self.__sock.recvfrom(1024)
             return response
         except socket.timeout:
             raise TimeoutError()
@@ -39,7 +39,7 @@ class Connection:
             self.__sock = None
 
 
-client = Connection("127.0.0.1", 5000)
+client = Connection("192.168.16.112", 5000)
 client.connect(SocketKind.SOCK_DGRAM)
 client.send(b"Hello, World!")
 client.close()
