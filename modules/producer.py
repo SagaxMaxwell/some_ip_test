@@ -1,5 +1,10 @@
-import socket
+from modules import Connection
 
 
 class Producer:
-    pass
+    def __init__(self, connection: Connection):
+        self.__connection = connection
+
+    @property
+    def connection(self) -> Connection:
+        return self.__connection
