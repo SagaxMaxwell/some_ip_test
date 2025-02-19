@@ -1,7 +1,7 @@
 import struct
 
 
-class Packet:
+class PacketBase:
     SERVICE_ID_LENGTH = 2
     METHOD_ID_LENGTH = 2
     LENGTH_LENGTH = 4
@@ -28,6 +28,7 @@ class Packet:
         self,
         service_id: bytes,
         method_id: bytes,
+        length: bytes,
         client_id: bytes,
         session_id: bytes,
         protocol_version: bytes,
@@ -45,13 +46,31 @@ class Packet:
         self.message_type = message_type
         self.return_code = return_code
         self.payload = payload
+        self.length = length
 
     @property
     def length(self) -> bytes:
-        serial = struct.pack(">I", Packet.LENGTH_LENGTH + len(self.payload))
-        if not isinstance(serial, bytes) or len(serial) != Packet.LENGTH_LENGTH:
-            raise ValueError(f"length must be {Packet.LENGTH_LENGTH} bytes")
-        return serial
+        return self.__length
+
+    @length.setter
+    def length(self, value: bytes):
+        expect_length = len(
+            self.request_id
+            + self.protocol_version
+            + self.interface_version
+            + self.message_type
+            + self.return_code
+            + self.payload
+        )
+        if not all(
+            [
+                isinstance(value, bytes),
+                len(value) == PacketBase.LENGTH_LENGTH,
+                int(value, 16) == expect_length,
+            ]
+        ):
+            raise ValueError(f"length must be {PacketBase.LENGTH_LENGTH} bytes")
+        self.__length = value
 
     @property
     def message_id(self) -> bytes:
@@ -67,8 +86,8 @@ class Packet:
 
     @service_id.setter
     def service_id(self, value: bytes):
-        if not isinstance(value, bytes) or len(value) != Packet.SERVICE_ID_LENGTH:
-            raise ValueError(f"service_id must be {Packet.SERVICE_ID_LENGTH} bytes")
+        if not isinstance(value, bytes) or len(value) != PacketBase.SERVICE_ID_LENGTH:
+            raise ValueError(f"service_id must be {PacketBase.SERVICE_ID_LENGTH} bytes")
         self.__service_id = value
 
     @property
@@ -77,8 +96,8 @@ class Packet:
 
     @method_id.setter
     def method_id(self, value: bytes):
-        if not isinstance(value, bytes) or len(value) != Packet.METHOD_ID_LENGTH:
-            raise ValueError(f"method_id must be {Packet.METHOD_ID_LENGTH} bytes")
+        if not isinstance(value, bytes) or len(value) != PacketBase.METHOD_ID_LENGTH:
+            raise ValueError(f"method_id must be {PacketBase.METHOD_ID_LENGTH} bytes")
         self.__method_id = value
 
     @property
@@ -87,8 +106,8 @@ class Packet:
 
     @client_id.setter
     def client_id(self, value: bytes):
-        if not isinstance(value, bytes) or len(value) != Packet.CLIENT_ID_LENGTH:
-            raise ValueError(f"client_id must be {Packet.CLIENT_ID_LENGTH} bytes")
+        if not isinstance(value, bytes) or len(value) != PacketBase.CLIENT_ID_LENGTH:
+            raise ValueError(f"client_id must be {PacketBase.CLIENT_ID_LENGTH} bytes")
         self.__client_id = value
 
     @property
@@ -97,8 +116,8 @@ class Packet:
 
     @session_id.setter
     def session_id(self, value: bytes):
-        if not isinstance(value, bytes) or len(value) != Packet.SESSION_ID_LENGTH:
-            raise ValueError(f"session_id must be {Packet.SESSION_ID_LENGTH} bytes")
+        if not isinstance(value, bytes) or len(value) != PacketBase.SESSION_ID_LENGTH:
+            raise ValueError(f"session_id must be {PacketBase.SESSION_ID_LENGTH} bytes")
         self.__session_id = value
 
     @property
@@ -107,9 +126,12 @@ class Packet:
 
     @protocol_version.setter
     def protocol_version(self, value: bytes):
-        if not isinstance(value, bytes) or len(value) != Packet.PROTOCOL_VERSION_LENGTH:
+        if (
+            not isinstance(value, bytes)
+            or len(value) != PacketBase.PROTOCOL_VERSION_LENGTH
+        ):
             raise ValueError(
-                f"protocol_version must be {Packet.PROTOCOL_VERSION_LENGTH} byte"
+                f"protocol_version must be {PacketBase.PROTOCOL_VERSION_LENGTH} byte"
             )
         self.__protocol_version = value
 
@@ -121,10 +143,10 @@ class Packet:
     def interface_version(self, value: bytes):
         if (
             not isinstance(value, bytes)
-            or len(value) != Packet.INTERFACE_VERSION_LENGTH
+            or len(value) != PacketBase.INTERFACE_VERSION_LENGTH
         ):
             raise ValueError(
-                f"interface_version must be {Packet.INTERFACE_VERSION_LENGTH} byte"
+                f"interface_version must be {PacketBase.INTERFACE_VERSION_LENGTH} byte"
             )
         self.__interface_version = value
 
@@ -134,8 +156,10 @@ class Packet:
 
     @message_type.setter
     def message_type(self, value: bytes):
-        if not isinstance(value, bytes) or len(value) != Packet.MESSAGE_TYPE_LENGTH:
-            raise ValueError(f"message_type must be {Packet.MESSAGE_TYPE_LENGTH} byte")
+        if not isinstance(value, bytes) or len(value) != PacketBase.MESSAGE_TYPE_LENGTH:
+            raise ValueError(
+                f"message_type must be {PacketBase.MESSAGE_TYPE_LENGTH} byte"
+            )
         self.__message_type = value
 
     @property
@@ -144,8 +168,10 @@ class Packet:
 
     @return_code.setter
     def return_code(self, value: bytes):
-        if not isinstance(value, bytes) or len(value) != Packet.RETURN_CODE_LENGTH:
-            raise ValueError(f"return_code must be {Packet.RETURN_CODE_LENGTH} byte")
+        if not isinstance(value, bytes) or len(value) != PacketBase.RETURN_CODE_LENGTH:
+            raise ValueError(
+                f"return_code must be {PacketBase.RETURN_CODE_LENGTH} byte"
+            )
         self.__return_code = value
 
     @property
@@ -158,25 +184,26 @@ class Packet:
             raise ValueError("payload must be bytes")
         self.__payload = value
 
-    def encode(self) -> bytes:
-        header = (
-            self.service_id
-            + self.method_id
+    @property
+    def header(self) -> bytes:
+        return (
+            self.message_id
             + self.length
-            + self.client_id
-            + self.session_id
+            + self.request_id
             + self.protocol_version
             + self.interface_version
             + self.message_type
             + self.return_code
         )
-        return header + self.payload
+
+    def encode(self) -> bytes:
+        return self.header + self.payload
 
     @classmethod
-    def decode(cls, data: bytes) -> "Packet":
-        if len(data) < Packet.HEADER_LENGTH:
+    def decode(cls, data: bytes) -> "PacketBase":
+        if len(data) < PacketBase.HEADER_LENGTH:
             raise ValueError("Invalid data length")
-        header = data[: Packet.HEADER_LENGTH]
+        header = data[:16]
         service_id = header[0:2]
         method_id = header[2:4]
         client_id = header[8:10]
@@ -185,7 +212,7 @@ class Packet:
         interface_version = header[13:14]
         message_type = header[14:15]
         return_code = header[15:16]
-        payload = data[Packet.HEADER_LENGTH :]
+        payload = data[16:]
         return cls(
             service_id=service_id,
             method_id=method_id,
